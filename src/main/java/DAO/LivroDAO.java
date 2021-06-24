@@ -7,13 +7,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 
+import models.Cadastro;
 import models.Livro;
 import utils.GerenciarConexao;
 
 public class LivroDAO {
 	
 	public static boolean salvar(Livro livro){
-		
+	
         boolean retorno = false;
         Connection conexao = null;
         PreparedStatement instrucaoSQL = null;
@@ -21,10 +22,13 @@ public class LivroDAO {
         try {
             conexao = GerenciarConexao.abrirConexao();
 
-            instrucaoSQL = conexao.prepareStatement("INSERT INTO produto(nome, preco) VALUES(?, ?)", Statement.RETURN_GENERATED_KEYS);
+            instrucaoSQL = conexao.prepareStatement("INSERT INTO produto(cod_barras, preco, nome, descricao, fk_id_editora) VALUES(?, ?, ?, ?, ?);", Statement.RETURN_GENERATED_KEYS);
  
-            instrucaoSQL.setString(1, livro.getTitulo());
+            instrucaoSQL.setInt(1, livro.getCodigoBarras());
             instrucaoSQL.setDouble(2, livro.getPreco());
+            instrucaoSQL.setString(3, livro.getTitulo());
+            instrucaoSQL.setString(4, livro.getDescricao());
+            instrucaoSQL.setInt(5, livro.getEditora().getId());
             
             int linhasAfetadas = instrucaoSQL.executeUpdate();
             
@@ -146,9 +150,10 @@ public class LivroDAO {
 	
 	public static ArrayList<Livro> consultarProdutos()
     {
-        ResultSet rs = null;
+        ResultSet resultLivro = null;
         Connection conexao = null;
         PreparedStatement instrucaoSQL = null; 
+        int aux = 0;
         
         ArrayList<Livro> listaProdutos = new ArrayList<Livro>();
         
@@ -157,14 +162,17 @@ public class LivroDAO {
             conexao = GerenciarConexao.abrirConexao();
             instrucaoSQL = conexao.prepareStatement("SELECT * FROM produto;");
 
-            rs = instrucaoSQL.executeQuery();
+            resultLivro = instrucaoSQL.executeQuery();
             
-            while(rs.next())
+            while(resultLivro.next())
             {
             	Livro livro = new Livro();
-            	livro.setId(rs.getInt("id"));
-            	livro.setTitulo(rs.getString("nome"));
-                livro.setPreco(rs.getDouble("preco"));
+            	livro.setId(resultLivro.getInt("id"));
+            	livro.setCodigoBarras(resultLivro.getInt("cod_barras"));
+            	livro.setTitulo(resultLivro.getString("nome"));
+                livro.setPreco(resultLivro.getDouble("preco"));
+                livro.setDescricao(resultLivro.getString("descricao"));
+                aux = resultLivro.getInt("fk_id_editora");
                 listaProdutos.add(livro);
             }
             
@@ -173,8 +181,18 @@ public class LivroDAO {
             listaProdutos = null;
         } finally{
             try {
-                if(rs!=null)
-                    rs.close();                
+                if(resultLivro!=null) {
+                    resultLivro.close();        
+	                try {
+	                	for(Livro lista: listaProdutos) {
+	                		ArrayList<Cadastro> editora = EditoraDAO.consultarEditorasID(aux);
+	                		lista.setEditora(editora.get(0));
+	                	}
+	            		
+	            	}catch(Exception e) {
+	            		System.out.println(e);
+	            	}
+                }
                 if(instrucaoSQL!=null)
                     instrucaoSQL.close();
                 
